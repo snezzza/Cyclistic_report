@@ -1,0 +1,322 @@
+---
+title: "Cyclistic Membership Report"
+author: "Snezana Ilincic"
+date: "2023-05-22"
+output: html_document
+---
+
+## Exploratory Analysis of Cyclistic Data
+
+### Introduction
+
+In this analysis, the goal is to explore the Cyclistic data set in order to gain insights into the riding patterns and behaviours of users. The objective is to determine how casual riders differ from annual membership riders, and then respectively, to propose a strategy aimed at converting casual riders to annual members.
+
+### Data Description
+
+The data set contains 12 CSV files, each representing a month of bike trip data (April 2022 - March 2023). Files were combined in order to create a comprehensive data set for the analysis. The variables in the data set include:
+
+- **ride_id**: Unique identifier for each ride
+- **rideable_type**: Type of bicycle (electric, classic)
+- **startet_at**: Start time and date of the ride
+- **ended_at**: End time and date of the ride
+- **start_station_name**: Name of the starting station
+- **end_station_name**: Name od ending station
+- **start_station_id**: ID of the starting station
+- **end_station_id**: ID of the ending station
+- **start_lat**: Latitude of the starting station
+- **end_lat**: Latitude of the ending station
+- **start_lng**: Longitude of the starting station
+- **end_lng**: Longitude of the ending station
+- **member_casual**: User type (annual mmeber, casual rider)
+
+Additionally, the following variables were created during the analysis:
+
+- **ride_length**: Duration of each ride in minutes
+- **day_of_week**: Day of the week of the ride
+- **month**: Month of the ride
+
+### Analysis Overview
+
+In the analysis, the goal is to explore and gain insights from the Cyclistic data. The primary objective is designing a marketing strategy aimed at converting casual riders to annual members. To achieve this, various data analysis and visualization tasks were performed.
+
+The structure of the document is as follows:
+
+1. **Data Preparation**: loading the required libraries, importing the data set, and performing cleaning and preprocessing steps.
+2. **Descriptive Statistics**:conducting descriptive statistics analysis to understand overall characteristics of the rides. Analyzing factors such as ride length, day of the weak, month, and averages.
+3. **Data Analysis**: examining the ride patterns for each month and throughout the weeks, focusing on ride length and total rides; identifying the most popular ride stations for both members and casual riders. These analyses  will provide insights into the areas where most rides started and ended as well as variations in bike usage throughout the year. 
+4. **Conclusion** insights and conclusion from the analysis.
+5. **Marketing Strategy**: the proposition of a marketing strategy aimed at converting casual riders to annual members. 
+
+Visualizations, tables, and code chunks are included in the document to support the analysis. 
+
+### Data Preparation
+
+```{r loading packages}
+#First, we need to load all the necessary packages
+library(tidyverse)
+library(lubridate)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(scales)
+```
+
+
+```{r defining file paths}
+#Next step is to load files and to combine them into one data frame
+files <- c(
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202205-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202206-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202207-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202208-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202209-divvy-publictripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202210-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202211-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202212-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202301-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202302-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202303-divvy-tripdata.csv",
+  "C:/Users/boric/Desktop/GA/Portfolio and CS/CS1/Datasets/202304-divvy-tripdata.csv"
+  
+)
+
+read_files <- map(files, read.csv)
+combined_data <- bind_rows(read_files)
+
+```
+
+```{r exploring the data}
+#exploring the first few rows of the combined data frame
+kable(head(combined_data)) %>% 
+  kable_styling()
+```
+```{r}
+#checking data types
+str(combined_data)
+```
+
+Here we can see that the **started_at** and **ended_at** columns are 'char' data type, and we need to convert them into the date-time format for further analysis. We shall also remove any missing values, and calculate length of each ride in minutes.
+
+
+```{r data cleaning and preprocessing}
+#Converting started_at and ended_at columns to date-time format
+combined_data$started_at <- ymd_hms(combined_data$started_at)
+combined_data$ended_at <- ymd_hms(combined_data$ended_at)
+
+#Checking and removing missing values
+combined_data <- na.omit(combined_data)
+
+#Computing ride length in mins
+combined_data$ride_length <- round(difftime(combined_data$ended_at, combined_data$started_at, units= "mins"),2)
+
+```
+```{r}
+#checking for the total number of observations
+nrow(combined_data)
+```
+
+```{r}
+#removing negative ride lengths
+combined_data <- combined_data[!combined_data$ride_length <0,]
+nrow(combined_data)
+  
+
+```
+```{r}
+#Extracting day of the week 
+combined_data$day_of_week <- wday(combined_data$started_at, label=TRUE)
+```
+```{r}
+#Extracting month of the year
+combined_data$month_ride <- month(combined_data$started_at, label=TRUE)
+```
+```{r}
+#Here we can see 3 new columns that show us the length of each ride, day of the week and month.
+kable(head(combined_data)) %>% 
+  kable_styling()
+```
+
+### Descriptive Statistics
+
+Conducting descriptive statistics analysis to understand overall characteristics of the rides. Analyzing factors such as ride length, day of the weak, month, and averages
+
+
+```{r descriptive statistics}
+#calculating total number of rides
+kable(nrow(combined_data)) %>% 
+  kable_styling()
+```
+This is the total number of rides for both casual riders and annual members in the period of the last 12 months. 
+```{r}
+#calculating total number of rides for casual and member riders
+casual_member_rides <- combined_data %>% 
+  group_by(member_casual) %>% 
+  count()
+kable(casual_member_rides) %>% 
+  kable_styling()
+```
+Here we see that the number of rides by Annual Members is greater than Casual Riders.
+Let us now explore how they compare on a monthly basis.
+```{r}
+#Total monthly rides for annual members
+monthly_total_member <- combined_data %>% 
+  group_by(month_ride) %>% 
+  filter(member_casual == "member") %>% 
+  count()
+
+ggplot(data = monthly_total_member) + 
+  geom_col(mapping = aes(x=month_ride, y=n), fill="steelblue") +
+  labs(x = "Month", y = "Total Rides") + 
+  ggtitle("Total Monthly RIdes for Annual Members") +
+  scale_y_continuous(labels = comma_format()) +
+  theme_minimal()
+```
+
+From the graph we can notice the pattern in Member Rides throughout the year. During the winter time in Chicago, probably because of the weather, there are far less number of rides compared to the spring/summer season where we can see the peak.
+
+
+```{r}
+#total monthly rides for casual riders
+monthly_total_casual <- combined_data %>% 
+  group_by(month_ride) %>% 
+  filter(member_casual == "casual") %>% 
+  count()
+
+ggplot(data = monthly_total_casual) + 
+  geom_col(mapping = aes(x=month_ride, y=n), fill = "darkorange") +
+  labs(x = "Month", y = "Total Rides") + 
+  ggtitle("Total Monthly RIdes for Casual Riders") +
+  scale_y_continuous(labels = comma_format()) +
+  theme_minimal()
+```
+
+The same goes with the Casual Riders, but far less number of rides during the winter time. One of the possible explanation is the tourist season which is not popular in Chicago during the winter months. 
+
+### Data Analysis
+
+Here we will examine the ride patterns for each month and day of the week, focusing on ride length and total rides; identifying the most popular ride stations for both members and casual riders.
+
+```{r}
+#calculating total number of weekly rides for both types of riders
+total_weekly <- combined_data %>% 
+  group_by(day_of_week, member_casual) %>% 
+  count()
+total_weekly
+
+ggplot(total_weekly, aes(x = day_of_week, y = n, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Day of Week", y = "Total Count", fill = "Member Type") +
+  scale_y_continuous(labels = comma_format()) +
+  scale_fill_manual(values = c("steelblue", "darkorange")) +
+  theme_minimal()
+
+```
+
+When it comes to weekly usage of bikes for annual members, we can see the consistency during the weekdays which peaks on Thursday, and is much lower on weekends. On the other hand, Casual Riders tend to ride more during the weekend compared to the weekdays, with peaks on Saturday. This can appoint to the fact that Annual Members use the service to commute during the week. 
+Now we will explore the average ride length for each type. 
+```{r}
+#calculating average ride length by days of the week for members and casual riders
+average_length_by_days <- combined_data %>% 
+  group_by(day_of_week, member_casual) %>% 
+  summarise(
+    average = mean(ride_length),
+    .groups = "keep"
+  )
+
+ggplot(average_length_by_days, aes(x = day_of_week, y = average, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Day of the Week", y = "Average Ride Length in Minutes", fill = "Member Type") +
+  scale_fill_manual(values = c("steelblue", "darkorange")) +
+  scale_y_continuous(labels = comma_format()) +
+  theme_minimal()
+```
+
+This graph shows us that the average ride length for Annual Members is pretty much consistent throughout the week ranging from 11 on weekdays to 14 minutes on weekends. As for the Casual Riders, this is much longer and ranges from 17 during the week to almost 25 minutes on weekends. 
+```{r}
+average_length_by_month <- combined_data %>% 
+  group_by(month_ride, member_casual) %>% 
+  summarise(
+    average = mean(ride_length),
+    .groups = "keep"
+  )
+
+
+ggplot(average_length_by_month, aes(x = month_ride, y = average, fill = member_casual)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Month", y = "Average Ride Length in Minutes", fill = "Member Type") +
+  scale_fill_manual(values = c("steelblue", "darkorange")) +
+  scale_y_continuous(labels = comma_format()) +
+  theme_minimal()
+```
+
+When it comes to the monthly usage patterns, Annual members are consistent with the length of the rides throughout the year which clearly indicates that they use it for commute. Contrary, Casual Riders tend to use it for longer period of times and mostly during the spring/summer months which is a clear sign that the usage is aimed at tourists. 
+
+
+#### Analysing the most popular stations in Chicago in Tableau
+
+
+![Member Start Stations](Member_Stations.png), ![Member End Stations](End_Member.png) 
+
+This chart indicates that all the popular stations are spread across the city. For example, stations like Streeter Dr and Grand Ave and DuSable Lake Shore Dr are situated near the lakefront, while Michigan Ave and Oak St are located in the downtown area.
+Based on this information, we can observe that there is significant bike activity in various areas of Chicago, including both downtown and lakefront regions. 
+
+![Casual End Stations](Causal_stations.png), ![Casual End Stations](End_Casual.png)
+
+The Streeter Dr and Grand Ave station is a very significant location for casual riders in Chicago. Considering almost double the number of rides compared to the second most popular station for casual riders, this indicates a high level of demand and activity in this area. 
+Casual riders tend to choose stations located both in the lakefront and in the downtown area.
+Iconic landmarks like Millennium Park and and Michigan Ave and Oak St among popular starting stations highlights the attractiveness of these areas for leisurely biking or tourist activities.
+
+In the following [link](https://public.tableau.com/views/Cyclistic_16850292560930/Membervs_CasualStations?:language=en-GB&publish=yes&:display_count=n&:origin=viz_share_link) is interactive visualization, you can see the top 10 most popular stations among both annual members and casual riders throughout the year.
+
+### Results
+
+**Total Number of Rides**: The analysis includes a total of 12 months of bike trip data. Annual members had total of 3,499,995 rides, while casual riders had 2,352,990 rides.
+
+**Monthly Ride Patterns**: Both annual members and casual riders exhibit a similar pattern in terms of monthly ride patterns. The number of rides is lower during the winter months and peaks during the spring/summer season.
+
+**Weekly Ride Patterns**: Annual members show consistent ride patterns throughout the week, with higher ride counts on weekdays and lower counts on weekends. Casual riders, on the other hand, tend to ride more during the weekends, particularly on Saturdays.
+
+**Average Ride Length**: The average ride length for annual members is consistent throughout the week, ranging from 11 minutes on weekdays to 14 minutes on weekends. In contrast, casual riders have longer average ride lengths, ranging from 17 minutes on weekdays to almost 25 minutes on weekends.
+
+**Popular Ride Stations**: The analysis identifies popular ride stations for both annual members and casual riders. The stations are spread across the city, including downtown and lakefront areas.
+
+### Insights
+
+1. Annual members are more likely to use the bike service for commuting purposes, as shown by their consistent ride patterns on weekdays.
+2. Casual riders are more likely to use the service for tourism and leisure, as indicated by longer rides during the weekends.
+3. The popularity of certain ride stations suggests areas of high demand and activity in Chicago.
+
+## Marketing Strategy
+
+Based on the insights from the analysis, here is a proposed strategy aimed at converting casual riders to annual members:
+
+1. **Targeted Promotions**: Develop targeted marketing campaign to promote benefits of annual membership highlighting features such as unlimited rides, priority access to bikes, and exclusive member discounts.
+2. **Partnerships and Collaborations**: Collaborate with local business, tourist attractions and hotels to offer joint promotions or incentives for annual membership. For example, provide discounted bike rentals or special packages for tourist who become annual members. 
+3. **Enhanced User Experience**: Continuously improve user experience for both annual members and casual riders, particularly in those areas with high casual rider demand. This includes bike availability, maintenance and expanding the network of ride stations.
+
+By implementing these strategies, Cyclistic can target casual riders effectively and encourage them to become annual members.
+
+### Thanks for reading.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
